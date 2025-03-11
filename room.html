@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MillZ Markerz - Room</title>
+  <style>
+    :root {
+      --dim1-primary: #ff00ff;
+      --dim1-secondary: #00ffff;
+      --dim2-primary: #00ffff;
+      --dim2-secondary: #ff00ff;
+      --dim3-primary: #ffff00;
+      --dim3-secondary: #ff8800;
+      --active-primary: #ff00ff;
+      --active-secondary: #00ffff;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: monospace;
+      min-height: 100vh;
+      background: linear-gradient(to bottom, #000020, #181848, #9124cc);
+      color: white;
+    }
+    header {
+      text-align: center;
+      padding: 1rem;
+    }
+    h1 {
+      color: var(--active-primary);
+      text-shadow: 0 0 10px var(--active-primary);
+      margin-bottom: 0.5rem;
+    }
+    .controls {
+      display: flex;
+      justify-content: center;
+      margin: 1rem 0;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    button {
+      background: linear-gradient(45deg, var(--active-primary), var(--active-secondary));
+      color: white;
+      border: 2px solid var(--active-primary);
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      font-family: monospace;
+      text-transform: uppercase;
+    }
+    .canvas-container {
+      display: flex;
+      justify-content: center;
+    }
+    canvas {
+      border: 2px solid var(--active-primary);
+      background-color: rgba(0, 0, 0, 0.5);
+      box-shadow: 0 0 15px var(--active-primary);
+      margin: 0 auto;
+      touch-action: none;
+    }
+    .room-info {
+      text-align: center;
+      margin-top: 1rem;
+      font-size: 0.875rem;
+      color: var(--active-secondary);
+    }
+    .dimension-selector {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin: 1rem auto;
+      padding: 0.5rem;
+      background: rgba(0, 0, 0, 0.3);
+      width: fit-content;
+      border-radius: 1rem;
+    }
+    .dimension-btn {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .dimension-btn.active {
+      transform: scale(1.1);
+      box-shadow: 0 0 10px currentColor;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>MillZ Markerz</h1>
+    <p>Room: <span id="roomId"></span></p>
+  </header>
+
+  <div class="dimension-selector">
+    <button class="dimension-btn active" style="background-color: #ff00ff;" data-dim="1"></button>
+    <button class="dimension-btn" style="background-color: #00ffff;" data-dim="2"></button>
+    <button class="dimension-btn" style="background-color: #ffff00;" data-dim="3"></button>
+  </div>
+
+  <div class="controls">
+    <button id="clearBtn">Clear Canvas</button>
+    <button id="shareBtn">Share Room</button>
+    <button id="exitBtn">Exit Room</button>
+  </div>
+
+  <div class="canvas-container">
+    <canvas id="drawingCanvas" width="320" height="440"></canvas>
+  </div>
+
+  <script>
+    // Get URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = urlParams.get("id") || "unknown";
+    document.getElementById("roomId").textContent = roomId;
+    
+    // Setup canvas
+    const canvas = document.getElementById("drawingCanvas");
+    const ctx = canvas.getContext("2d");
+    let isDrawing = false;
+    let currentDimension = 1;
+    
+    // Set initial stroke style
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#ff00ff";
+    
+    // Drawing functions
+    function startDrawing(e) {
+      isDrawing = true;
+      draw(e);
+    }
+    
+    function draw(e) {
+      if (!isDrawing) return;
+      
+      // Get proper coordinates whether mouse or touch
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX || e.touches[0].clientX) - rect.left;
+      const y = (e.clientY || e.touches[0].clientY) - rect.top;
+      
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    }
+    
+    function stopDrawing() {
+      isDrawing = false;
+      ctx.beginPath();
+    }
+    
+    // Event listeners for drawing
+    canvas.addEventListener("mousedown", startDrawing);
+    canvas.addEventListener("mousemove", draw);
+    canvas.addEventListener("mouseup", stopDrawing);
+    canvas.addEventListener("mouseout", stopDrawing);
+    
+    // Touch support
+    canvas.addEventListener("touchstart", function(e) {
+      e.preventDefault();
+      startDrawing(e);
+    });
+    canvas.addEventListener("touchmove", function(e) {
+      e.preventDefault();
+      draw(e);
+    });
+    canvas.addEventListener("touchend", stopDrawing);
+    
+    // Clear canvas
+    document.getElementById("clearBtn").addEventListener("click", function() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
+    
+    // Share room
+    document.getElementById("shareBtn").addEventListener("click", function() {
+      const url = window.location.href;
+      if (navigator.share) {
+        navigator.share({
+          title: "Join my MillZ Markerz Room",
+          text: "Join me in room " + roomId,
+          url: url
+        });
+      } else {
+        // Fallback
+        prompt("Copy this room link:", url);
+      }
+    });
+    
+    // Exit room
+    document.getElementById("exitBtn").addEventListener("click", function() {
+      window.location.href = "index.html";
+    });
+    
+    // Dimension switching
+    const dimensionBtns = document.querySelectorAll(".dimension-btn");
+    dimensionBtns.forEach(btn => {
+      btn.addEventListener("click", function() {
+        dimensionBtns.forEach(b => b.classList.remove("active"));
+        this.classList.add("active");
+        
+        const dimension = parseInt(this.dataset.dim);
+        currentDimension = dimension;
+        
+        // Update colors based on dimension
+        const root = document.documentElement;
+        if (dimension === 1) {
+          root.style.setProperty("--active-primary", "#ff00ff");
+          root.style.setProperty("--active-secondary", "#00ffff");
+          ctx.strokeStyle = "#ff00ff";
+        } else if (dimension === 2) {
+          root.style.setProperty("--active-primary", "#00ffff");
+          root.style.setProperty("--active-secondary", "#ff00ff");
+          ctx.strokeStyle = "#00ffff";
+        } else if (dimension === 3) {
+          root.style.setProperty("--active-primary", "#ffff00");
+          root.style.setProperty("--active-secondary", "#ff8800");
+          ctx.strokeStyle = "#ffff00";
+        }
+      });
+    });
+  </script>
+</body>
+</html>

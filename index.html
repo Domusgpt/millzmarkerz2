@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MillZ Markerz</title>
+  <style>
+    :root {
+      --dim1-primary: #ff00ff;
+      --dim1-secondary: #00ffff;
+      --active-primary: #ff00ff;
+      --active-secondary: #00ffff;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: monospace;
+      min-height: 100vh;
+      background: linear-gradient(to bottom, #000020, #181848, #9124cc);
+      color: white;
+      display: flex;
+      justify-content: center;
+    }
+    .container {
+      padding: 2rem;
+      text-align: center;
+      max-width: 500px;
+    }
+    h1 {
+      color: #ff00ff;
+      text-shadow: 0 0 10px #ff00ff;
+    }
+    button {
+      background: linear-gradient(45deg, #ff00ff, #00ffff);
+      color: white;
+      border: 2px solid #ff00ff;
+      padding: 0.5rem 1rem;
+      margin: 0.5rem;
+      cursor: pointer;
+    }
+    input {
+      background: rgba(0, 0, 0, 0.5);
+      border: 2px solid #ff00ff;
+      padding: 0.5rem;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>MillZ Markerz</h1>
+    <p>Collaborative Vaporwave Whiteboard</p>
+    
+    <div class="controls" style="margin: 2rem 0;">
+      <button id="createRoom">Create Room</button>
+      <div style="margin-top: 1rem;">
+        <input type="text" id="roomId" placeholder="Room ID">
+        <button id="joinRoom">Join</button>
+      </div>
+    </div>
+    
+    <script>
+      document.getElementById("createRoom").addEventListener("click", function() {
+        const roomId = Math.random().toString(36).substring(2, 10);
+        window.location.href = "room.html?id=" + roomId;
+      });
+      
+      document.getElementById("joinRoom").addEventListener("click", function() {
+        const roomId = document.getElementById("roomId").value.trim();
+        if (!roomId) {
+          alert("Please enter a room ID");
+          return;
+        }
+        window.location.href = "room.html?id=" + roomId;
+      });
+    </script>
+  </div>
+</body>
+</html>
