@@ -4,6 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MillZ Markerz - Room</title>
+  
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  
   <style>
     :root {
       --dim1-primary: #ff00ff;
@@ -87,6 +92,32 @@
       transform: scale(1.1);
       box-shadow: 0 0 10px currentColor;
     }
+    .users-container {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+    .user-badge {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--active-primary);
+      padding: 0.25rem 0.5rem;
+      border-radius: 1rem;
+      font-size: 0.75rem;
+    }
+    #notification {
+      position: fixed;
+      top: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(45deg, var(--active-primary), var(--active-secondary));
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 100;
+    }
   </style>
 </head>
 <body>
@@ -111,17 +142,44 @@
     <canvas id="drawingCanvas" width="320" height="440"></canvas>
   </div>
 
+  <div class="users-container" id="usersContainer">
+    <!-- Active users will appear here -->
+  </div>
+
+  <div id="notification"></div>
+
   <script>
+    // Initialize Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyDFDGqTAIZDVIm9K5-e_VrwY0u0WcnF4vI",
+      authDomain: "millz-markerz.firebaseapp.com",
+      databaseURL: "https://millz-markerz-default-rtdb.firebaseio.com",
+      projectId: "millz-markerz",
+      storageBucket: "millz-markerz.appspot.com",
+      messagingSenderId: "475269214659",
+      appId: "1:475269214659:web:3b8d8b9e5f8c8d8d8d8d8d"
+    };
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    
     // Get URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const roomId = urlParams.get("id") || "unknown";
     document.getElementById("roomId").textContent = roomId;
+    
+    // Generate a random user ID
+    const userId = 'user_' + Math.random().toString(36).substring(2, 9);
+    const userColors = ['#ff6b6b', '#48dbfb', '#1dd1a1', '#feca57', '#ff9ff3', '#54a0ff'];
+    const userColor = userColors[Math.floor(Math.random() * userColors.length)];
     
     // Setup canvas
     const canvas = document.getElementById("drawingCanvas");
     const ctx = canvas.getContext("2d");
     let isDrawing = false;
     let currentDimension = 1;
+    let lastX = 0;
+    let lastY = 0;
     
     // Set initial stroke style
     ctx.lineWidth = 5;
@@ -129,29 +187,130 @@
     ctx.lineJoin = "round";
     ctx.strokeStyle = "#ff00ff";
     
+    // Reference to the room in Firebase
+    const roomRef = database.ref('rooms/' + roomId);
+    const usersRef = roomRef.child('users');
+    const linesRef = roomRef.child('lines');
+    
+    // Add user to the room
+    usersRef.child(userId).set({
+      id: userId,
+      color: userColor,
+      dimension: currentDimension,
+      lastActive: firebase.database.ServerValue.TIMESTAMP
+    });
+    
+    // Remove user when they leave
+    window.addEventListener('beforeunload', () => {
+      usersRef.child(userId).remove();
+    });
+    
+    // Show notification
+    function showNotification(message) {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      notification.style.opacity = 1;
+      setTimeout(() => {
+        notification.style.opacity = 0;
+      }, 3000);
+    }
+    
+    // Listen for active users
+    usersRef.on('value', (snapshot) => {
+      const usersContainer = document.getElementById('usersContainer');
+      usersContainer.innerHTML = '';
+      
+      const users = snapshot.val() || {};
+      Object.values(users).forEach(user => {
+        const userBadge = document.createElement('div');
+        userBadge.className = 'user-badge';
+        userBadge.textContent = user.id.substring(0, 8);
+        userBadge.style.borderColor = user.color;
+        usersContainer.appendChild(userBadge);
+      });
+    });
+    
+    // Listen for new lines
+    linesRef.on('child_added', (snapshot) => {
+      const line = snapshot.val();
+      if (line.userId !== userId) {
+        drawLineFromData(line);
+      }
+    });
+    
+    // Listen for clear events
+    roomRef.child('lastClear').on('value', (snapshot) => {
+      const lastClear = snapshot.val();
+      if (lastClear && lastClear.userId !== userId) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        showNotification(`Canvas cleared by ${lastClear.userId.substring(0, 8)}`);
+      }
+    });
+    
     // Drawing functions
     function startDrawing(e) {
       isDrawing = true;
-      draw(e);
+      const rect = canvas.getBoundingClientRect();
+      lastX = (e.clientX || e.touches[0].clientX) - rect.left;
+      lastY = (e.clientY || e.touches[0].clientY) - rect.top;
     }
     
     function draw(e) {
       if (!isDrawing) return;
       
-      // Get proper coordinates whether mouse or touch
       const rect = canvas.getBoundingClientRect();
-      const x = (e.clientX || e.touches[0].clientX) - rect.left;
-      const y = (e.clientY || e.touches[0].clientY) - rect.top;
+      const currentX = (e.clientX || e.touches[0].clientX) - rect.left;
+      const currentY = (e.clientY || e.touches[0].clientY) - rect.top;
       
-      ctx.lineTo(x, y);
-      ctx.stroke();
+      // Draw line
       ctx.beginPath();
-      ctx.moveTo(x, y);
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(currentX, currentY);
+      ctx.stroke();
+      
+      // Save to Firebase
+      const lineData = {
+        userId: userId,
+        dimension: currentDimension,
+        startX: lastX / canvas.width,
+        startY: lastY / canvas.height,
+        endX: currentX / canvas.width,
+        endY: currentY / canvas.height,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      };
+      linesRef.push(lineData);
+      
+      // Update last position
+      lastX = currentX;
+      lastY = currentY;
     }
     
     function stopDrawing() {
       isDrawing = false;
+    }
+    
+    // Draw line from data (received from Firebase)
+    function drawLineFromData(lineData) {
+      // Set color based on dimension
+      if (lineData.dimension === 1) {
+        ctx.strokeStyle = "#ff00ff"; // Pink
+      } else if (lineData.dimension === 2) {
+        ctx.strokeStyle = "#00ffff"; // Cyan
+      } else if (lineData.dimension === 3) {
+        ctx.strokeStyle = "#ffff00"; // Yellow
+      }
+      
+      // Convert relative coordinates to actual canvas pixels
+      const startX = lineData.startX * canvas.width;
+      const startY = lineData.startY * canvas.height;
+      const endX = lineData.endX * canvas.width;
+      const endY = lineData.endY * canvas.height;
+      
+      // Draw line
       ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
     }
     
     // Event listeners for drawing
@@ -174,6 +333,10 @@
     // Clear canvas
     document.getElementById("clearBtn").addEventListener("click", function() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      roomRef.child('lastClear').set({
+        userId: userId,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      });
     });
     
     // Share room
@@ -193,6 +356,7 @@
     
     // Exit room
     document.getElementById("exitBtn").addEventListener("click", function() {
+      usersRef.child(userId).remove();
       window.location.href = "index.html";
     });
     
@@ -221,7 +385,29 @@
           root.style.setProperty("--active-secondary", "#ff8800");
           ctx.strokeStyle = "#ffff00";
         }
+        
+        // Update user dimension in Firebase
+        usersRef.child(userId).update({
+          dimension: dimension,
+          lastActive: firebase.database.ServerValue.TIMESTAMP
+        });
       });
+    });
+    
+    // Keep user "alive" with heartbeat
+    setInterval(() => {
+      usersRef.child(userId).update({
+        lastActive: firebase.database.ServerValue.TIMESTAMP
+      });
+    }, 30000);
+    
+    // Check if we received initial data (existing drawings)
+    roomRef.once('value', (snapshot) => {
+      if (snapshot.exists()) {
+        showNotification('Joined existing room!');
+      } else {
+        showNotification('Created new room!');
+      }
     });
   </script>
 </body>
