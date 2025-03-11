@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --dim1-primary: #ff00ff;
+  --dim1-secondary: #00ffff;
+  --dim1-accent: #ffff00;
+}
+
+html {
+  font-family: monospace;
+  color: white;
+}
+
+body {
+  background-color: #000;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
